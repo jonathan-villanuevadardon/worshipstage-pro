@@ -1,0 +1,35 @@
+# Dependencies and generated frontend
+node_modules/
+**/node_modules/
+dist/
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# PocketBase runtime data (never publish local users or tokens)
+apps/pocketbase/pb_data/
+apps/pocketbase/pb_snapshots/
+apps/pocketbase/*.log
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.cache/
+.tmp/
+tmp/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

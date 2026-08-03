@@ -1,0 +1,17 @@
+FROM node:22-alpine
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY tools ./tools
+
+RUN npm ci --omit=dev
+
+COPY apps/api ./apps/api
+
+EXPOSE 3001
+
+CMD ["node", "apps/api/src/main.js"]

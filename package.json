@@ -1,0 +1,21 @@
+{
+  "name": "monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others --raw \"npm run dev --prefix apps/web\" \"npm run dev --prefix apps/api\"",
+    "build": "npm run build --prefix apps/web",
+    "build:hostinger": "npm run build",
+    "start": "npm run start --prefix apps/api",
+    "lint": "concurrently --raw \"npm run lint --prefix apps/web\" \"npm run lint --prefix apps/api\"",
+    "check": "npm run lint && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "supabase": "2.111.0"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ]
+}

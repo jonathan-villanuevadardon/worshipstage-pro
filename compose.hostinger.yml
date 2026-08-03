@@ -1,0 +1,31 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: deploy/hostinger/Dockerfile.web
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/hostinger/Dockerfile.api
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      SUPABASE_URL: ${SUPABASE_URL:?Define SUPABASE_URL in .env.production}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Define SUPABASE_PUBLISHABLE_KEY in .env.production}
+      CORS_ORIGIN: https://${DOMAIN}
+      WEBSITE_DOMAIN: ${DOMAIN}
+      INTEGRATED_AI_API_URL: ${INTEGRATED_AI_API_URL:-}
+      INTEGRATED_AI_API_KEY: ${INTEGRATED_AI_API_KEY:-}
+      WEBSITE_ID: ${WEBSITE_ID:-}
+      PROXY_ENTRANCE_ID: ${PROXY_ENTRANCE_ID:-}
+    restart: unless-stopped
