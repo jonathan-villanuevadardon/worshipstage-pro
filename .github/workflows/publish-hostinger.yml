@@ -44,6 +44,11 @@ jobs:
           test -f dist/index.html
           test -f dist/.htaccess
           test -d dist/assets
+          test -f dist/package.json
+          test -f dist/package-lock.json
+          test -f dist/server.mjs
+          npm --prefix dist ci
+          npm --prefix dist run build
 
       - name: Publish compiled files to hostinger branch
         shell: bash

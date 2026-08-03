@@ -67,6 +67,11 @@ Si la integración actual apunta a `main`, elimínala y vuelve a crearla apuntan
 `index.html`, `.htaccess`, `assets/` y los demás archivos compilados, no las carpetas
 `apps/`, `deploy/` o `supabase/` del código fuente.
 
+Si Hostinger detecta el despliegue como aplicación Node.js, la rama también incluye
+un `package.json` mínimo. Usa `npm run build` como comando de compilación y
+`npm start` como comando de inicio; el proceso escucha automáticamente el puerto
+indicado por Hostinger mediante `PORT`.
+
 Esta modalidad sirve el frontend y conecta directamente con Supabase. Las funciones
 que pasan por la API Express (`/hcgi/api`, incluida la IA integrada) requieren el VPS
 con Docker Compose o una URL de API externa configurada en la variable de repositorio

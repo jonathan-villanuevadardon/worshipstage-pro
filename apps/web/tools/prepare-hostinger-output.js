@@ -6,7 +6,13 @@ import path from 'node:path';
 const outputDir = path.resolve(process.cwd(), '../../dist');
 const compatibilityDir = path.join(outputDir, 'apps', 'web');
 const requiredFiles = ['index.html', '.htaccess'];
-const optionalFiles = ['llms.txt', 'worshipstage-icon.png'];
+const optionalFiles = [
+  'llms.txt',
+  'worshipstage-icon.png',
+  'package.json',
+  'package-lock.json',
+  'server.mjs',
+];
 
 for (const fileName of requiredFiles) {
   const sourcePath = path.join(outputDir, fileName);
