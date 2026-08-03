@@ -50,4 +50,26 @@ Comprobación:
 curl -fsS https://TU_DOMINIO/hcgi/api/health
 ```
 
+## Hosting Web/Cloud de Hostinger conectado a Git
+
+El hosting compartido no ejecuta el código fuente de Vite. El workflow
+`.github/workflows/publish-hostinger.yml` compila cada cambio de `main` y publica
+solamente los archivos web listos en la rama `hostinger`.
+
+En **hPanel > Sitios web > Administrar > Git** configura:
+
+- Repositorio: `https://github.com/jonathan-villanuevadardon/worshipstage-pro.git`
+- Rama: `hostinger`
+- Ruta de instalación: vacía, para usar `/public_html`
+
+Si la integración actual apunta a `main`, elimínala y vuelve a crearla apuntando a
+`hostinger`; luego activa la implementación automática. En `public_html` deben quedar
+`index.html`, `.htaccess`, `assets/` y los demás archivos compilados, no las carpetas
+`apps/`, `deploy/` o `supabase/` del código fuente.
+
+Esta modalidad sirve el frontend y conecta directamente con Supabase. Las funciones
+que pasan por la API Express (`/hcgi/api`, incluida la IA integrada) requieren el VPS
+con Docker Compose o una URL de API externa configurada en la variable de repositorio
+`VITE_API_SERVER_URL` antes de compilar.
+
 La carpeta `apps/pocketbase/` se conserva únicamente como fuente histórica de la migración y no forma parte de los workspaces, scripts ni despliegues activos.
