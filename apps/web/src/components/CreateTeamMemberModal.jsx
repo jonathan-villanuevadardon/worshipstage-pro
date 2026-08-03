@@ -41,8 +41,6 @@ export default function CreateTeamMemberModal({ open, onClose, onSuccess }) {
 
     setIsSubmitting(true);
     try {
-      // Mocking the backend /users/invite endpoint by creating user directly
-      // In a real scenario with the requested backend endpoint, we would call it here.
       const tempPassword = crypto.randomUUID().slice(0, 12) + 'aA1!';
       
       const newUser = await pb.collection('users').create({
@@ -53,19 +51,19 @@ export default function CreateTeamMemberModal({ open, onClose, onSuccess }) {
         last_name: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         role: formData.role,
-        status: 'invited',
+        status: 'active',
         organization_id: activeOrganizationId
       }, { $autoCancel: false });
 
-      // Request password reset as a makeshift invitation email
-      await pb.collection('users').requestPasswordReset(formData.email, { $autoCancel: false });
-
-      toast.success('Team member created and invitation sent');
+      toast.success('Team member created', {
+        description: `Temporary password: ${tempPassword}`,
+        duration: 20000,
+      });
       onSuccess?.();
       onClose();
     } catch (error) {
       console.error('Error creating user:', error);
-      toast.error(error?.response?.message || 'Failed to create team member');
+      toast.error(error?.message || error?.response?.message || 'Failed to create team member');
     } finally {
       setIsSubmitting(false);
     }
@@ -154,7 +152,7 @@ export default function CreateTeamMemberModal({ open, onClose, onSuccess }) {
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Sending Invite...' : 'Add & Invite'}
+              {isSubmitting ? 'Creating...' : 'Add Team Member'}
             </Button>
           </DialogFooter>
         </form>

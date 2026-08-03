@@ -218,27 +218,19 @@ function createCollection(collectionName) {
 
     async create(input) {
       if (collectionName === 'users') {
-        const invitationClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        });
-        const { data: signUpData, error: signUpError } = await invitationClient.auth.signUp({
-          email: input.email,
-          password: input.password,
-          options: { data: {
+        const { data, error } = await supabase.functions.invoke('admin-create-user', {
+          body: {
+            email: input.email,
+            password: input.password,
             first_name: input.first_name,
             last_name: input.last_name,
             organization_id: input.organization_id,
-          } },
+            role: input.role || 'volunteer',
+          },
         });
-        throwOnError(signUpError);
-        if (input.role && input.role !== 'volunteer') {
-          const { error: roleError } = await supabase.rpc('set_user_role', {
-            target_user_id: signUpData.user.id,
-            new_role: input.role,
-          });
-          throwOnError(roleError);
-        }
-        return { id: signUpData.user.id, ...mapData(collectionName, input) };
+        throwOnError(error);
+        if (data?.error) throw new Error(data.error);
+        return normalizeRecord(data.user);
       }
       const { data, error } = await supabase.from(table).insert(mapData(collectionName, input)).select().single();
       throwOnError(error);
