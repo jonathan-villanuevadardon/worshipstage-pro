@@ -16,3 +16,12 @@ export const API_SERVER_URL = normalizeBaseUrl(
 	import.meta.env.VITE_API_SERVER_URL,
 	'/hcgi/api',
 );
+
+const browserOrigin = typeof window === 'undefined' ? '' : window.location.origin;
+
+export const APP_URL = normalizeBaseUrl(
+	import.meta.env.VITE_APP_URL,
+	import.meta.env.PROD
+		? 'https://cyan-duck-221179.hostingersite.com'
+		: browserOrigin,
+);
