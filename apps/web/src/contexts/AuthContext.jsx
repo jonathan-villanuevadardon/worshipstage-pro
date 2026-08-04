@@ -93,33 +93,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: { data: {
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          organization_id: userData.organization_id,
-        } },
-      });
-      if (error) throw error;
-      if (data.session) {
-        toast.success('Account created successfully.');
-        navigate('/dashboard');
-      } else {
-        toast.success('Check your email to confirm your account.');
-        navigate('/login');
-      }
-      return data.user;
-    } catch (error) {
-      console.error('Registration error:', error);
-      toast.error(error.message || 'Failed to create account.');
-      throw error;
-    }
-  };
-
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
@@ -164,7 +137,6 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     login,
     logout,
-    register,
     resetPassword,
     organizations,
     activeOrganizationId,
