@@ -18,7 +18,7 @@ export default function NavigationMenu({ isMobile = false, onItemClick }) {
       baseItems.push(
         { label: 'Organizations', path: '/organizations', icon: Building2 },
         { label: 'Users', path: '/users', icon: Users },
-        { label: 'Teams', path: '/teams', icon: UsersRound },
+        { label: 'Grupos', path: '/teams', icon: UsersRound },
         { label: 'Services', path: '/services', icon: Calendar },
         { label: 'Songs', path: '/songs', icon: Music },
         { label: 'Repertoires', path: '/repertoires', icon: ListMusic }
@@ -26,13 +26,14 @@ export default function NavigationMenu({ isMobile = false, onItemClick }) {
     } else if (role === 'church_admin' || role === 'pastor') {
       baseItems.push(
         { label: 'Users', path: '/users', icon: Users },
-        { label: 'Teams', path: '/teams', icon: UsersRound },
+        { label: 'Grupos', path: '/teams', icon: UsersRound },
         { label: 'Services', path: '/services', icon: Calendar },
         { label: 'Songs', path: '/songs', icon: Music },
         { label: 'Repertoires', path: '/repertoires', icon: ListMusic }
       );
     } else if (role === 'worship_leader') {
       baseItems.push(
+        { label: 'Grupos', path: '/teams', icon: UsersRound },
         { label: 'Services', path: '/services', icon: Calendar },
         { label: 'Songs', path: '/songs', icon: Music },
         { label: 'Repertoires', path: '/repertoires', icon: ListMusic }

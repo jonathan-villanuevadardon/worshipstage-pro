@@ -4,16 +4,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import pb from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarIcon, Users, Music, ArrowRight, Activity, Clock, Disc3 } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, Music, ArrowRight, Activity, Clock, Disc3, Printer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { generateServicePdf } from '@/lib/servicePrint.js';
+import { toast } from 'sonner';
 
 export default function RoleBasedDashboard() {
   const { currentUser, activeOrganizationId, activeOrganization } = useAuth();
   const [upcomingServices, setUpcomingServices] = useState([]);
   const [stats, setStats] = useState({ services: 0, songs: 0, team: 0 });
   const [loading, setLoading] = useState(true);
+  const [printingServiceId, setPrintingServiceId] = useState(null);
 
   const isFullAccess = ['super_admin', 'church_admin', 'pastor', 'worship_leader'].includes(currentUser?.role);
 
@@ -28,18 +31,14 @@ export default function RoleBasedDashboard() {
 
       if (!activeOrganizationId) return;
       let filterStr = `organization_id = "${activeOrganizationId}" && date >= "${today}" && date <= "${nextWeek}"`;
+      let assignedServiceIds = null;
       
       if (['musician', 'volunteer'].includes(currentUser.role)) {
         const assignments = await pb.collection('service_assignments').getFullList({
           filter: `team_member_id = "${currentUser.id}"`,
           $autoCancel: false
         });
-        const serviceIds = assignments.map(a => a.service_id);
-        if (serviceIds.length > 0) {
-          filterStr += ` && id ?= "${serviceIds.join('","')}"`;
-        } else {
-          filterStr += ` && id = "none"`;
-        }
+        assignedServiceIds = new Set(assignments.map((assignment) => assignment.service_id));
       }
 
       const services = await pb.collection('services').getFullList({
@@ -48,7 +47,9 @@ export default function RoleBasedDashboard() {
         expand: 'repertoire_id,service_assignments_via_service_id.team_member_id',
         $autoCancel: false
       });
-      setUpcomingServices(services);
+      setUpcomingServices(assignedServiceIds
+        ? services.filter((service) => assignedServiceIds.has(service.id))
+        : services);
 
       if (isFullAccess) {
         const allServices = await pb.collection('services').getList(1, 1, { filter: `organization_id = "${activeOrganizationId}"`, $autoCancel: false });
@@ -74,6 +75,20 @@ export default function RoleBasedDashboard() {
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
+  };
+
+  const handlePrint = async (service) => {
+    try {
+      setPrintingServiceId(service.id);
+      toast.info('Generating PDF...');
+      await generateServicePdf(service);
+      toast.success('PDF generated successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setPrintingServiceId(null);
+    }
   };
 
   if (loading) return <LoadingSpinner text="Loading dashboard..." className="mt-20" />;
@@ -174,6 +189,19 @@ export default function RoleBasedDashboard() {
                           <p className="text-sm font-medium">{service.start_time || 'TBD'}</p>
                           <p className="text-xs text-muted-foreground">{service.location || 'Main Sanctuary'}</p>
                         </div>
+                      </div>
+                      <div className="mt-4 flex justify-end border-t border-border pt-4">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="gap-2"
+                          disabled={printingServiceId === service.id}
+                          onClick={() => handlePrint(service)}
+                        >
+                          <Printer className="h-4 w-4" />
+                          {printingServiceId === service.id ? 'Generating...' : 'Print Sheet'}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

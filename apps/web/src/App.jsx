@@ -67,7 +67,7 @@ function App() {
               />
               <Route 
                 path="/teams" 
-                element={<ProtectedRoute allowedRoles={['super_admin', 'church_admin', 'pastor']}><TeamManagementPage /></ProtectedRoute>} 
+                element={<ProtectedRoute allowedRoles={['super_admin', 'church_admin', 'pastor', 'worship_leader']}><TeamManagementPage /></ProtectedRoute>}
               />
               <Route 
                 path="/role-management" 
