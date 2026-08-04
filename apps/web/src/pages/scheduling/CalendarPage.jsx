@@ -21,6 +21,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
+  const [editingService, setEditingService] = useState(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -234,7 +235,10 @@ export default function CalendarPage() {
               </Button>
             </div>
             {canManage && (
-              <Button onClick={() => setCreateModalOpen(true)} className="gap-2">
+              <Button onClick={() => {
+                setEditingService(null);
+                setCreateModalOpen(true);
+              }} className="gap-2">
                 <Plus className="w-4 h-4" /> Crear Nuevo Servicio
               </Button>
             )}
@@ -277,6 +281,11 @@ export default function CalendarPage() {
           service={selectedService}
           open={detailsModalOpen}
           onClose={() => setDetailsModalOpen(false)}
+          onEdit={(serviceToEdit) => {
+            setDetailsModalOpen(false);
+            setEditingService(serviceToEdit);
+            setCreateModalOpen(true);
+          }}
           onRefresh={() => {
             fetchServices();
             setDetailsModalOpen(false);
@@ -285,7 +294,11 @@ export default function CalendarPage() {
 
         <ServiceFormModal 
           open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
+          service={editingService}
+          onClose={() => {
+            setCreateModalOpen(false);
+            setEditingService(null);
+          }}
           onSuccess={fetchServices}
         />
       </div>

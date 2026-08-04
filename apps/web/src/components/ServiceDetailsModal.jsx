@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from './ConfirmDialog.jsx';
 
-export default function ServiceDetailsModal({ service, open, onClose, onRefresh }) {
+export default function ServiceDetailsModal({ service, open, onClose, onRefresh, onEdit }) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -122,7 +122,7 @@ export default function ServiceDetailsModal({ service, open, onClose, onRefresh 
 
             <div className="flex gap-2">
               {canEdit && (
-                <Button variant="outline" className="gap-2" onClick={() => toast.info('Edit mode not implemented in this demo.')}>
+                <Button variant="outline" className="gap-2" onClick={() => onEdit?.(service)}>
                   <Edit className="w-4 h-4" /> Edit
                 </Button>
               )}

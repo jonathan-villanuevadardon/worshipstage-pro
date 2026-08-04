@@ -21,7 +21,7 @@ const initialForm = {
   repertoire_id: 'none',
 };
 
-export default function ServiceFormModal({ open, onClose, onSuccess }) {
+export default function ServiceFormModal({ open, onClose, onSuccess, service = null }) {
   const { activeOrganizationId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -29,13 +29,26 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
   const [teams, setTeams] = useState([]);
   const [selectedTeamIds, setSelectedTeamIds] = useState([]);
   const [formData, setFormData] = useState(initialForm);
+  const isEditing = Boolean(service?.id);
 
   useEffect(() => {
     if (!open || !activeOrganizationId) return;
+
+    setFormData(service ? {
+      name: service.title || service.name || '',
+      date: new Date(service.date).toISOString().slice(0, 10),
+      time: service.start_time || '',
+      service_type: service.service_type || '',
+      location: service.location || '',
+      description: service.description || '',
+      repertoire_id: service.repertoire_id || 'none',
+    } : initialForm);
+    setSelectedTeamIds([]);
+
     const fetchOptions = async () => {
       setOptionsLoading(true);
       try {
-        const [repertoireResult, teamResult] = await Promise.all([
+        const [repertoireResult, teamResult, serviceTeamsResult] = await Promise.all([
           supabase
             .from('repertoires')
             .select('id, name, status, song_count')
@@ -47,11 +60,16 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
             .eq('organization_id', activeOrganizationId)
             .eq('status', 'active')
             .order('name'),
+          service?.id
+            ? supabase.from('service_teams').select('team_id').eq('service_id', service.id)
+            : Promise.resolve({ data: [], error: null }),
         ]);
         if (repertoireResult.error) throw repertoireResult.error;
         if (teamResult.error) throw teamResult.error;
+        if (serviceTeamsResult.error) throw serviceTeamsResult.error;
         setRepertoires(repertoireResult.data || []);
         setTeams(teamResult.data || []);
+        setSelectedTeamIds((serviceTeamsResult.data || []).map((item) => item.team_id));
       } catch (error) {
         console.error('Error loading service options:', error);
         toast.error('No fue posible cargar repertorios y grupos');
@@ -60,7 +78,7 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
       }
     };
     fetchOptions();
-  }, [open, activeOrganizationId]);
+  }, [open, activeOrganizationId, service]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -88,20 +106,33 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
     setLoading(true);
     try {
       const localServiceDate = new Date(`${formData.date}T12:00:00`);
-      const { error } = await supabase.rpc('create_service_with_groups', {
-        target_organization_id: activeOrganizationId,
-        service_name: formData.name.trim(),
-        service_date: localServiceDate.toISOString(),
-        service_start_time: formData.time,
-        service_type: formData.service_type,
-        service_location: formData.location.trim(),
-        service_description: formData.description.trim(),
-        target_repertoire_id: formData.repertoire_id === 'none' ? null : formData.repertoire_id,
-        target_team_ids: selectedTeamIds,
-      });
+      const repertoireId = formData.repertoire_id === 'none' ? null : formData.repertoire_id;
+      const { error } = isEditing
+        ? await supabase.rpc('update_service_with_groups', {
+          target_service_id: service.id,
+          target_service_name: formData.name.trim(),
+          target_service_date: localServiceDate.toISOString(),
+          target_start_time: formData.time,
+          target_service_type: formData.service_type,
+          target_location: formData.location.trim(),
+          target_description: formData.description.trim(),
+          target_repertoire_id: repertoireId,
+          target_team_ids: selectedTeamIds,
+        })
+        : await supabase.rpc('create_service_with_groups', {
+          target_organization_id: activeOrganizationId,
+          service_name: formData.name.trim(),
+          service_date: localServiceDate.toISOString(),
+          service_start_time: formData.time,
+          service_type: formData.service_type,
+          service_location: formData.location.trim(),
+          service_description: formData.description.trim(),
+          target_repertoire_id: repertoireId,
+          target_team_ids: selectedTeamIds,
+        });
       if (error) throw error;
 
-      toast.success('Servicio creado y miembros asignados');
+      toast.success(isEditing ? 'Servicio actualizado' : 'Servicio creado y miembros asignados');
       reset();
       await onSuccess?.();
       onClose();
@@ -117,7 +148,7 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Crear nuevo servicio</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar servicio' : 'Crear nuevo servicio'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 py-4">
           <div className="space-y-2">
@@ -207,7 +238,9 @@ export default function ServiceFormModal({ open, onClose, onSuccess }) {
 
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
-            <Button type="submit" disabled={loading || optionsLoading}>{loading ? 'Creando...' : 'Crear servicio'}</Button>
+            <Button type="submit" disabled={loading || optionsLoading}>
+              {loading ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Crear servicio'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
