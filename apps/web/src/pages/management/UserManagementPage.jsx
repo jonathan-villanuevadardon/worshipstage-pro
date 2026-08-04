@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import pb from '@/lib/supabaseClient';
+import pb, { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Users, UserPlus, Trash2, Shield } from 'lucide-react';
+import { Loader2, UserCheck, UserPlus, UserX, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CreateTeamMemberModal from '@/components/CreateTeamMemberModal';
 
@@ -17,6 +17,7 @@ export default function UserManagementPage() {
   const [workloads, setWorkloads] = useState({});
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -85,17 +86,62 @@ export default function UserManagementPage() {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to remove this user?')) return;
+    const user = users.find((item) => item.id === userId);
+    const displayName = user?.first_name || user?.name || user?.email || 'este usuario';
+    if (!window.confirm(`¿Eliminar permanentemente a ${displayName}? Esta acción no se puede deshacer y también eliminará sus asignaciones.`)) return;
+
+    setPendingAction({ userId, type: 'delete' });
     try {
-      await pb.collection('users').delete(userId, { $autoCancel: false });
-      toast.success('User removed');
+      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+        body: { action: 'delete', target_user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setUsers((current) => current.filter((item) => item.id !== userId));
+      setWorkloads((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
+      toast.success('Usuario eliminado permanentemente.');
     } catch (err) {
       console.error(err);
-      toast.error('Failed to delete user');
+      toast.error('No fue posible eliminar al usuario.');
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleStatusChange = async (user) => {
+    const nextStatus = user.status === 'active' ? 'inactive' : 'active';
+    const actionLabel = nextStatus === 'inactive' ? 'deshabilitar' : 'reactivar';
+    const displayName = user.first_name || user.name || user.email;
+    if (!window.confirm(`¿Deseas ${actionLabel} a ${displayName}?`)) return;
+
+    setPendingAction({ userId: user.id, type: 'status' });
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+        body: { action: 'set_status', target_user_id: user.id, status: nextStatus },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setUsers((current) => current.map((item) => (
+        item.id === user.id ? { ...item, status: nextStatus } : item
+      )));
+      toast.success(nextStatus === 'inactive' ? 'Usuario deshabilitado.' : 'Usuario reactivado.');
+    } catch (err) {
+      console.error(err);
+      toast.error('No fue posible cambiar el estado del usuario.');
+    } finally {
+      setPendingAction(null);
     }
   };
 
   const canManage = ['super_admin', 'pastor', 'worship_leader'].includes(currentUser?.role);
+  const canChangeStatus = ['super_admin', 'church_admin', 'pastor'].includes(currentUser?.role);
+  const canPermanentlyDelete = currentUser?.role === 'super_admin';
 
   if (loading) return <LoadingSpinner text="Loading users..." className="mt-20" />;
 
@@ -124,7 +170,7 @@ export default function UserManagementPage() {
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Workload</TableHead>
-                  {canManage && <TableHead className="text-right">Actions</TableHead>}
+                  {(canManage || canChangeStatus) && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,12 +220,45 @@ export default function UserManagementPage() {
                           <span className="text-muted-foreground">assignments</span>
                         </div>
                       </TableCell>
-                      {canManage && (
+                      {(canManage || canChangeStatus) && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            {user.id !== currentUser.id && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteUser(user.id)}>
-                                <Trash2 className="h-4 w-4" />
+                            {user.id !== currentUser.id && user.role !== 'super_admin' && canChangeStatus && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                title={user.status === 'active' ? 'Deshabilitar usuario' : 'Reactivar usuario'}
+                                aria-label={user.status === 'active' ? `Deshabilitar a ${user.email}` : `Reactivar a ${user.email}`}
+                                disabled={pendingAction?.userId === user.id}
+                                onClick={() => handleStatusChange(user)}
+                              >
+                                {pendingAction?.userId === user.id && pendingAction.type === 'status' ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : user.status === 'active' ? (
+                                  <UserX className="h-4 w-4" />
+                                ) : (
+                                  <UserCheck className="h-4 w-4" />
+                                )}
+                                {user.status === 'active' ? 'Deshabilitar' : 'Reactivar'}
+                              </Button>
+                            )}
+                            {user.id !== currentUser.id && user.role !== 'super_admin' && canPermanentlyDelete && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                                title="Eliminar permanentemente"
+                                aria-label={`Eliminar permanentemente a ${user.email}`}
+                                disabled={pendingAction?.userId === user.id}
+                                onClick={() => handleDeleteUser(user.id)}
+                              >
+                                {pendingAction?.userId === user.id && pendingAction.type === 'delete' ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                                Eliminar
                               </Button>
                             )}
                           </div>
