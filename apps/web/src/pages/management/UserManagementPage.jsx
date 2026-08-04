@@ -11,6 +11,43 @@ import { Loader2, UserCheck, UserPlus, UserX, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CreateTeamMemberModal from '@/components/CreateTeamMemberModal';
 
+async function invokeUserManagementAction(body) {
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !refreshed.session) {
+    const sessionError = new Error('Tu sesión venció. Inicia sesión nuevamente.');
+    sessionError.code = 'SESSION_EXPIRED';
+    throw sessionError;
+  }
+
+  const { data, error } = await supabase.functions.invoke('admin-manage-user', { body });
+  if (error) {
+    let message = error.message;
+    try {
+      const details = await error.context?.json();
+      message = details?.error || details?.message || message;
+    } catch {
+      // The relay did not return a JSON error body.
+    }
+    const functionError = new Error(message || 'No fue posible completar la acción.');
+    functionError.code = error.context?.status === 401 ? 'SESSION_EXPIRED' : 'FUNCTION_ERROR';
+    throw functionError;
+  }
+  if (data?.error) throw new Error(data.error);
+
+  return data;
+}
+
+async function showManagementError(error, fallbackMessage) {
+  if (error?.code === 'SESSION_EXPIRED' || /session not found|invalid jwt|jwt expired/i.test(error?.message || '')) {
+    toast.error('Tu sesión venció. Inicia sesión nuevamente.');
+    await supabase.auth.signOut({ scope: 'local' });
+    window.setTimeout(() => window.location.assign('/login'), 700);
+    return;
+  }
+
+  toast.error(error?.message || fallbackMessage);
+}
+
 export default function UserManagementPage() {
   const { currentUser, activeOrganizationId } = useAuth();
   const [users, setUsers] = useState([]);
@@ -92,11 +129,7 @@ export default function UserManagementPage() {
 
     setPendingAction({ userId, type: 'delete' });
     try {
-      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
-        body: { action: 'delete', target_user_id: userId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await invokeUserManagementAction({ action: 'delete', target_user_id: userId });
 
       setUsers((current) => current.filter((item) => item.id !== userId));
       setWorkloads((current) => {
@@ -107,7 +140,7 @@ export default function UserManagementPage() {
       toast.success('Usuario eliminado permanentemente.');
     } catch (err) {
       console.error(err);
-      toast.error('No fue posible eliminar al usuario.');
+      await showManagementError(err, 'No fue posible eliminar al usuario.');
     } finally {
       setPendingAction(null);
     }
@@ -121,11 +154,11 @@ export default function UserManagementPage() {
 
     setPendingAction({ userId: user.id, type: 'status' });
     try {
-      const { data, error } = await supabase.functions.invoke('admin-manage-user', {
-        body: { action: 'set_status', target_user_id: user.id, status: nextStatus },
+      await invokeUserManagementAction({
+        action: 'set_status',
+        target_user_id: user.id,
+        status: nextStatus,
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
       setUsers((current) => current.map((item) => (
         item.id === user.id ? { ...item, status: nextStatus } : item
@@ -133,7 +166,7 @@ export default function UserManagementPage() {
       toast.success(nextStatus === 'inactive' ? 'Usuario deshabilitado.' : 'Usuario reactivado.');
     } catch (err) {
       console.error(err);
-      toast.error('No fue posible cambiar el estado del usuario.');
+      await showManagementError(err, 'No fue posible cambiar el estado del usuario.');
     } finally {
       setPendingAction(null);
     }
