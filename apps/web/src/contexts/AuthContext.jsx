@@ -94,6 +94,62 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async ({
+    email,
+    password,
+    firstName,
+    lastName,
+    registrationType,
+    organizationId,
+    churchName,
+  }) => {
+    try {
+      const metadata = {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        registration_type: registrationType,
+      };
+
+      if (registrationType === 'new_church') {
+        metadata.church_name = churchName.trim();
+      } else {
+        metadata.organization_id = organizationId;
+      }
+
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: `${APP_URL}/login`,
+          data: metadata,
+        },
+      });
+      if (error) throw error;
+
+      if (authData.session && authData.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+        if (profileError) throw profileError;
+
+        setCurrentUser(profile);
+        await loadOrganizations(profile);
+        toast.success('Cuenta creada correctamente.');
+        navigate('/dashboard');
+      } else {
+        toast.success('Cuenta creada. Revisa tu correo para confirmar el acceso.');
+      }
+
+      return authData;
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error(error.message || 'No fue posible crear la cuenta.');
+      throw error;
+    }
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
@@ -137,6 +193,7 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     isLoading,
     login,
+    register,
     logout,
     resetPassword,
     organizations,
