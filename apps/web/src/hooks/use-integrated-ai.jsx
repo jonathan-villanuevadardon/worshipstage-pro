@@ -337,23 +337,31 @@ function useIntegratedAi() {
 		} catch (err) {
 			toast({
 				variant: 'destructive',
-				title: 'Error',
+				title: 'No fue posible responder',
 				description: err.message,
 			});
 
-			const last = messages.current[messages.current.length - 1];
-			if (last?.role === 'assistant' && !last.content) {
-				messages.current.pop();
-				setMessages([...messages.current]);
-			}
+			setMessages((current) => {
+				const last = current[current.length - 1];
+				return last?.role === 'assistant' && !last.content ? current.slice(0, -1) : current;
+			});
 		} finally {
 			abortControllerRef.current = null;
 			setIsStreaming(false);
 		}
 	}, [handleSSEEvent]);
 
-	const clearMessages = useCallback(() => {
-		setMessages([]);
+	const clearMessages = useCallback(async () => {
+		try {
+			await integratedAiClient.clearHistory();
+			setMessages([]);
+		} catch (err) {
+			toast({
+				variant: 'destructive',
+				title: 'No fue posible borrar el historial',
+				description: err.message,
+			});
+		}
 	}, []);
 
 	return {
