@@ -9,15 +9,20 @@ import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
 import TranspositionPresetButtons from './TranspositionPresetButtons';
 import { useSongTransposition } from '@/hooks/useSongTransposition';
+import { detectKey } from '@/lib/musicTransposition';
 
 const KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
 
 export default function SongTransposeViewer({ 
   songText = '', 
-  originalKey = 'C',
+  originalKey = '',
   initialTranspose = 0,
   onTransposeChange
 }) {
+  const effectiveOriginalKey = useMemo(
+    () => originalKey || detectKey(songText),
+    [originalKey, songText]
+  );
   const {
     transposeValue,
     capo,
@@ -26,7 +31,7 @@ export default function SongTransposeViewer({
     updateNotationMode,
     updateDestinationKey,
     getTransposedSong
-  } = useSongTransposition(songText, originalKey);
+  } = useSongTransposition(songText, effectiveOriginalKey);
 
   // Initialize if passed from props
   React.useEffect(() => {
@@ -48,13 +53,13 @@ export default function SongTransposeViewer({
     // A simplified helper just to show the new root key
     const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-    let idx = SHARPS.indexOf(originalKey);
-    if (idx === -1) idx = FLATS.indexOf(originalKey);
-    if (idx === -1) return originalKey;
+    let idx = SHARPS.indexOf(effectiveOriginalKey);
+    if (idx === -1) idx = FLATS.indexOf(effectiveOriginalKey);
+    if (idx === -1) return effectiveOriginalKey;
 
     const newIdx = (((idx + transposeValue) % 12) + 12) % 12;
     return notationMode === 'flats' ? FLATS[newIdx] : SHARPS[newIdx];
-  }, [originalKey, transposeValue, notationMode]);
+  }, [effectiveOriginalKey, transposeValue, notationMode]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -65,6 +70,9 @@ export default function SongTransposeViewer({
     
     // Convert chords to bold spans for printing
     const htmlContent = transposedContent
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/\[(.*?)\]/g, '<strong style="color: #2563eb;">[$1]</strong>')
       .replace(/\n/g, '<br>');
 
@@ -146,7 +154,7 @@ export default function SongTransposeViewer({
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="space-y-2">
             <Label>Destination Key</Label>
-            <Select value={currentKey} onValueChange={(val) => updateDestinationKey(val, originalKey)}>
+            <Select value={currentKey} onValueChange={(val) => updateDestinationKey(val, effectiveOriginalKey)}>
               <SelectTrigger className="bg-background">
                 <SelectValue />
               </SelectTrigger>
@@ -202,7 +210,7 @@ export default function SongTransposeViewer({
         <div className="flex items-center gap-6">
           <div className="flex flex-col">
             <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Original Key</span>
-            <span className="font-medium text-foreground">{originalKey}</span>
+            <span className="font-medium text-foreground">{effectiveOriginalKey}</span>
           </div>
           <ArrowRightLeft className="w-4 h-4 text-muted-foreground opacity-50" />
           <div className="flex flex-col">

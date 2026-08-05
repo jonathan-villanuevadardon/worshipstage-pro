@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import pb from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { detectKey, parseChords } from '@/lib/musicTransposition';
 
 export default function SongFormPage() {
   const { id } = useParams();
@@ -38,6 +39,15 @@ export default function SongFormPage() {
     notes: '',
     status: 'active'
   });
+
+  const chordAnalysis = useMemo(() => {
+    const source = formData.chords || formData.lyrics;
+    const detectedChords = parseChords(source);
+    return {
+      count: detectedChords.length,
+      key: detectedChords.length > 0 ? detectKey(source) : '',
+    };
+  }, [formData.chords, formData.lyrics]);
 
   useEffect(() => {
     if (isEdit) {
@@ -84,7 +94,11 @@ export default function SongFormPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title) {
-      toast.error('Title is required');
+      toast.error('El título es obligatorio.');
+      return;
+    }
+    if (!activeOrganizationId) {
+      toast.error('Selecciona una iglesia antes de guardar la canción.');
       return;
     }
 
@@ -93,22 +107,31 @@ export default function SongFormPage() {
       const dataToSave = {
         ...formData,
         organization_id: activeOrganizationId,
-        tempo: formData.tempo ? parseInt(formData.tempo) : null
+        key: formData.key || chordAnalysis.key,
+        tempo: formData.tempo === '' ? 0 : Number(formData.tempo),
       };
+
+      if (!Number.isFinite(dataToSave.tempo) || dataToSave.tempo < 0) {
+        toast.error('El tempo debe ser un número válido.');
+        return;
+      }
+
+      if (!isEdit) dataToSave.created_by = currentUser?.id || '';
 
       if (isEdit) {
         await pb.collection('songs').update(id, dataToSave, { $autoCancel: false });
-        toast.success('Song updated successfully');
+        toast.success('Canción actualizada correctamente.');
       } else {
         const newSong = await pb.collection('songs').create(dataToSave, { $autoCancel: false });
-        toast.success('Song created successfully');
+        toast.success('Canción creada correctamente.');
         navigate(`/songs/${newSong.id}`);
         return;
       }
       navigate('/songs');
     } catch (error) {
       console.error(error);
-      toast.error(isEdit ? 'Failed to update song' : 'Failed to create song');
+      const action = isEdit ? 'actualizar' : 'crear';
+      toast.error(`No fue posible ${action} la canción: ${error.message || 'error desconocido'}`);
     } finally {
       setSaving(false);
     }
@@ -207,8 +230,25 @@ export default function SongFormPage() {
                 value={formData.chords} 
                 onChange={handleChange} 
                 className="min-h-[200px] bg-background font-mono" 
-                placeholder="Enter chord chart here..."
+                placeholder={'Escribe acordes entre corchetes, por ejemplo [C] [G] [Am] [F], o en líneas separadas:\nC   G/B   Am7   Fmaj7'}
               />
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-muted-foreground">
+                  {chordAnalysis.count > 0
+                    ? `${chordAnalysis.count} acorde${chordAnalysis.count === 1 ? '' : 's'} detectado${chordAnalysis.count === 1 ? '' : 's'} · tonalidad probable: ${chordAnalysis.key}`
+                    : 'Todavía no se detectan acordes. Usa [C] o una línea como C  G  Am  F.'}
+                </span>
+                {chordAnalysis.key && formData.key !== chordAnalysis.key && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSelectChange('key', chordAnalysis.key)}
+                  >
+                    Usar tonalidad {chordAnalysis.key}
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

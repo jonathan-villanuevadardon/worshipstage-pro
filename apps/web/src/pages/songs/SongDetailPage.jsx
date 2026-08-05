@@ -143,7 +143,7 @@ export default function SongDetailPage() {
           <div className="flex-1 mt-4">
             <SongTransposeViewer 
               songText={song.chords || song.lyrics || ''}
-              originalKey={song.key || 'C'}
+              originalKey={song.key || ''}
               initialTranspose={0}
             />
           </div>
