@@ -1,0 +1,8 @@
+## Pages
+- [Chat - WorshipStage Pro](/chat): No description available
+- [Dashboard - WorshipStage Pro](/rolebaseddashboard): No description available
+- [My availability - WorshipStage Pro](/availabilitycalendar): Manage your availability for service assignments
+- [Notifications - WorshipStage Pro](/notificationpanel): No description available
+- [Repertoires - WorshipStage Pro](/repertoirelibrary): No description available
+- [Services Calendar - WorshipStage Pro](/calendar): No description available
+- [Team assignments - WorshipStage Pro](/teamassignmentpanel): Manage team member assignments to services
