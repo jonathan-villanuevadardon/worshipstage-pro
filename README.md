@@ -21,7 +21,7 @@ Variables principales:
 
 El esquema reproducible está en `supabase/migrations/`. Todas las tablas públicas tienen RLS. El primer usuario registrado se convierte en `super_admin`; los demás registros abiertos reciben el rol `volunteer`.
 
-En el panel de Supabase configura **Authentication > URL Configuration** con la URL del sitio y agrega `https://TU_DOMINIO/reset-password` a Redirect URLs. Si mantienes la confirmación de correo habilitada, configura también un proveedor SMTP para producción.
+En el panel de Supabase configura **Authentication > URL Configuration** con `https://cfeahidalgo.click` como Site URL y agrega `https://cfeahidalgo.click/login` y `https://cfeahidalgo.click/reset-password` a Redirect URLs. Si mantienes la confirmación de correo habilitada, configura también un proveedor SMTP para producción.
 
 ## Desarrollo y verificación
 
@@ -47,7 +47,7 @@ El stack levanta Caddy y la API Node.js. La base de datos y Auth permanecen admi
 Comprobación:
 
 ```bash
-curl -fsS https://TU_DOMINIO/hcgi/api/health
+curl -fsS https://cfeahidalgo.click/hcgi/api/health
 ```
 
 ## Hosting Web/Cloud de Hostinger conectado a Git

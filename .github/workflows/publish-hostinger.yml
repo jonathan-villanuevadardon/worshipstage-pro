@@ -37,7 +37,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_API_SERVER_URL: ${{ vars.VITE_API_SERVER_URL }}
-          VITE_APP_URL: ${{ vars.VITE_APP_URL || 'https://cyan-duck-221179.hostingersite.com' }}
+          VITE_APP_URL: https://cfeahidalgo.click
 
       - name: Verify Hostinger document root
         shell: bash
