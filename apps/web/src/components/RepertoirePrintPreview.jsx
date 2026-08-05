@@ -59,8 +59,8 @@ export default function RepertoirePrintPreview({ repertoire, songs, options }) {
       </div>
 
       <div
-        className="relative w-full overflow-hidden rounded-md border border-slate-300 bg-white text-slate-900 shadow-sm"
-        style={{ aspectRatio: '210 / 297', padding: '3% 5.7% 4.5%' }}
+        className="relative flex w-full flex-col overflow-hidden rounded-md border border-slate-300 bg-white text-slate-900 shadow-sm"
+        style={{ aspectRatio: '210 / 297', padding: '2% 5.7% 3.5%' }}
       >
         <div className="text-[5px] text-slate-500 leading-none mb-1">{repertoire?.name || 'Repertorio'}</div>
         <div className="text-[8px] font-bold leading-tight mb-1">{partLabel}</div>
@@ -81,8 +81,8 @@ export default function RepertoirePrintPreview({ repertoire, songs, options }) {
         )}
 
         <div
-          className="grid gap-[3%] mt-1 border-t border-slate-200 pt-1 overflow-hidden"
-          style={{ gridTemplateColumns: `repeat(${songLayout.metrics.columns}, minmax(0, 1fr))`, height: '82%' }}
+          className="mb-[3%] mt-1 grid min-h-0 flex-1 gap-[3%] overflow-hidden border-t border-slate-200 pt-1"
+          style={{ gridTemplateColumns: `repeat(${songLayout.metrics.columns}, minmax(0, 1fr))` }}
         >
           {page.columns.map((columnLines, columnIndex) => (
             <pre

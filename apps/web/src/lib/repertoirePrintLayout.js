@@ -9,7 +9,8 @@ const PAGE_HEIGHT_MM = 297;
 const PAGE_WIDTH_MM = 210;
 const HORIZONTAL_MARGIN_MM = 12;
 const COLUMN_GAP_MM = 6;
-const FOOTER_TOP_MM = 283;
+const FOOTER_TOP_MM = 287;
+const CHART_FOOTER_CLEARANCE_MM = 1.5;
 
 function formatSongDuration(seconds) {
   if (!seconds) return '00:00';
@@ -60,11 +61,23 @@ export function wrapChartPreservingSpacing(content, maxCharacters) {
   return lines;
 }
 
-function estimateHeaderHeight(songTitle, notes, firstPart) {
-  const titleLines = Math.max(1, Math.ceil(String(songTitle || '').length / 64));
-  if (!firstPart) return 12 + ((titleLines - 1) * 4);
-  const noteLines = notes ? Math.max(1, Math.ceil(String(notes).length / 105)) : 0;
-  return 22 + ((titleLines - 1) * 4) + (noteLines * 3.5);
+function estimateChartStart(songTitle, notes, firstPart) {
+  const titleLength = String(songTitle || '').length;
+  const titleLines = Math.max(1, Math.ceil((titleLength + 30) / 80));
+  const titleLastBaseline = 12 + ((titleLines - 1) * 4);
+  if (!firstPart) return titleLastBaseline + 6;
+
+  const metadataLines = Math.max(1, Math.ceil((titleLength + 90) / 180));
+  const metadataY = 18 + ((titleLines - 1) * 4);
+  let lastHeaderBaseline = metadataY + ((metadataLines - 1) * 3);
+
+  if (notes) {
+    const noteLines = Math.max(1, Math.ceil((String(notes).length + 7) / 190));
+    const notesY = metadataY + (metadataLines * 3) + 1;
+    lastHeaderBaseline = notesY + ((noteLines - 1) * 3);
+  }
+
+  return lastHeaderBaseline + 6;
 }
 
 export function calculatePrintMetrics(options = {}, songTitle = '', notes = '') {
@@ -73,10 +86,14 @@ export function calculatePrintMetrics(options = {}, songTitle = '', notes = '') 
   const totalGaps = COLUMN_GAP_MM * (normalized.columns - 1);
   const columnWidth = (usableWidth - totalGaps) / normalized.columns;
   const characterWidth = normalized.fontSize * 0.62 * MM_PER_POINT;
-  const lineHeight = normalized.fontSize * 1.32 * MM_PER_POINT;
+  const lineHeight = normalized.fontSize * 1.08 * MM_PER_POINT;
   const maxCharacters = Math.max(12, Math.floor((columnWidth - 2) / characterWidth));
-  const firstStart = HORIZONTAL_MARGIN_MM + estimateHeaderHeight(songTitle, notes, true);
-  const continuingStart = HORIZONTAL_MARGIN_MM + estimateHeaderHeight(songTitle, '', false);
+  const firstStart = estimateChartStart(songTitle, notes, true);
+  const continuingStart = estimateChartStart(songTitle, '', false);
+  const linesPerColumn = (start) => Math.max(
+    1,
+    Math.floor((FOOTER_TOP_MM - CHART_FOOTER_CLEARANCE_MM - start) / lineHeight) + 1
+  );
 
   return {
     ...normalized,
@@ -90,8 +107,8 @@ export function calculatePrintMetrics(options = {}, songTitle = '', notes = '') 
     footerTop: FOOTER_TOP_MM,
     firstStart,
     continuingStart,
-    firstLinesPerColumn: Math.max(1, Math.floor((FOOTER_TOP_MM - firstStart - 3) / lineHeight)),
-    continuingLinesPerColumn: Math.max(1, Math.floor((FOOTER_TOP_MM - continuingStart - 3) / lineHeight)),
+    firstLinesPerColumn: linesPerColumn(firstStart),
+    continuingLinesPerColumn: linesPerColumn(continuingStart),
   };
 }
 
@@ -119,13 +136,32 @@ export function paginateChartLines(lines, metrics) {
     const linesPerColumn = part === 1
       ? metrics.firstLinesPerColumn
       : metrics.continuingLinesPerColumn;
+    const pageCapacity = linesPerColumn * metrics.columns;
+    const requiresAnotherPage = (lines.length - offset) > pageCapacity;
     const columns = [];
     for (let columnIndex = 0; columnIndex < metrics.columns; columnIndex += 1) {
       if (offset >= lines.length) {
         columns.push([]);
         continue;
       }
-      const columnEnd = findNaturalColumnEnd(lines, offset, linesPerColumn);
+      // When another page is unavoidable, consume the complete printable area
+      // before adding a page. Natural section boundaries remain useful on the
+      // final page, where they do not create an unnecessary page break.
+      const hardEnd = Math.min(lines.length, offset + linesPerColumn);
+      let columnEnd = hardEnd;
+      if (!requiresAnotherPage) {
+        const naturalEnd = findNaturalColumnEnd(lines, offset, linesPerColumn);
+        const remainingColumns = metrics.columns - columnIndex - 1;
+        const remainingCapacity = remainingColumns * linesPerColumn;
+        const remainingAfterNaturalBreak = lines.length - naturalEnd;
+
+        // A semantic break is allowed only when the rest still fits in the
+        // columns left on this page. Otherwise it would create a nearly empty
+        // continuation page even though the content physically fits here.
+        if (remainingAfterNaturalBreak <= remainingCapacity) {
+          columnEnd = naturalEnd;
+        }
+      }
       columns.push(lines.slice(offset, columnEnd));
       offset = columnEnd;
     }

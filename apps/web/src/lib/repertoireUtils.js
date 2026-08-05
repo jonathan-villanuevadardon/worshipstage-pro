@@ -116,18 +116,18 @@ function drawPdfSongPage(doc, repertoire, songLayout, page) {
     if (columnIndex < metrics.columns - 1) {
       const dividerX = x + metrics.columnWidth + (metrics.columnGap / 2);
       doc.setDrawColor(226, 232, 240);
-      doc.line(dividerX, chartStart, dividerX, metrics.footerTop - 3);
+      doc.line(dividerX, chartStart, dividerX, metrics.footerTop - 2);
     }
   });
 
   doc.setDrawColor(148, 163, 184);
   doc.line(metrics.marginX, metrics.footerTop, 198, metrics.footerTop);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setTextColor(71, 85, 105);
-  doc.text(partLabel, metrics.marginX, 289);
+  doc.text(partLabel, metrics.marginX, 292);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${repertoire.name || 'Repertorio'} | Canción ${songLayout.order}`, 198, 289, { align: 'right' });
+  doc.text(`${repertoire.name || 'Repertorio'} | Canción ${songLayout.order}`, 198, 292, { align: 'right' });
 }
 
 export function buildRepertoirePDF(repertoire, songs, options = {}) {
@@ -192,13 +192,13 @@ export const printRepertoire = (repertoire, songs, options = {}) => {
 
   printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(repertoire.name)}</title><style>
     @page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;color:#0f172a;background:#fff;font-family:Arial,sans-serif}
-    .sheet{width:210mm;height:297mm;padding:6mm 12mm 8mm;position:relative;display:flex;flex-direction:column;page-break-after:always;overflow:hidden}
+    .sheet{width:210mm;height:297mm;padding:4mm 12mm 5mm;position:relative;display:flex;flex-direction:column;page-break-after:always;overflow:hidden}
     .sheet:last-child{page-break-after:auto}.repertoire{font-size:6pt;color:#64748b;margin-bottom:1mm}h1{font-size:11pt;line-height:1.1;margin:0 0 1.5mm}
     .metadata{display:flex;align-items:center;flex-wrap:wrap;gap:.7mm 3mm;padding:1mm 0;border-top:.2mm solid #cbd5e1;border-bottom:.2mm solid #cbd5e1;font-size:6.5pt;line-height:1.1}
     .metadata span{color:#64748b}.metadata strong{white-space:nowrap}.notes{font-size:6.2pt;padding:1mm 0;color:#334155}
-    .chart{display:grid;grid-template-columns:repeat(var(--columns),minmax(0,1fr));gap:6mm;flex:1;min-height:0;margin-bottom:8mm;padding-top:2mm;border-top:.25mm solid #cbd5e1;overflow:hidden}
+    .chart{display:grid;grid-template-columns:repeat(var(--columns),minmax(0,1fr));gap:6mm;flex:1;min-height:0;margin-bottom:5mm;padding-top:1mm;border-top:.25mm solid #cbd5e1;overflow:hidden}
     .chart pre{margin:0;min-width:0;overflow:hidden;white-space:pre;font-family:"Courier New",Courier,monospace;font-size:var(--font-size);line-height:var(--line-height)}
-    .chart pre+pre{border-left:.2mm solid #e2e8f0;padding-left:3mm}footer{position:absolute;left:12mm;right:12mm;bottom:3.5mm;border-top:.25mm solid #94a3b8;padding-top:1.5mm;display:flex;justify-content:space-between;gap:5mm;font-size:8pt;color:#475569}
+    .chart pre+pre{border-left:.2mm solid #e2e8f0;padding-left:3mm}footer{position:absolute;left:12mm;right:12mm;bottom:2.5mm;border-top:.25mm solid #94a3b8;padding-top:1mm;display:flex;justify-content:space-between;gap:5mm;font-size:7pt;color:#475569}
     @media screen{body{background:#e2e8f0;padding:10mm 0}.sheet{margin:0 auto 10mm;background:#fff;box-shadow:0 2mm 8mm rgba(15,23,42,.18)}}
   </style></head><body>${sheets || '<section class="sheet"><h1>No hay canciones en este repertorio.</h1></section>'}<script>window.onload=()=>{window.print();window.close()}</script></body></html>`);
   printWindow.document.close();

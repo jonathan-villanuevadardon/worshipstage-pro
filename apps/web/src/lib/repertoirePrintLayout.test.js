@@ -74,6 +74,26 @@ test('prefers named song sections over a closer generic blank line', () => {
   assert.equal(pages[0].columns[1][0], 'CORO');
 });
 
+test('fills every column before creating a continuation page', () => {
+  const metrics = { columns: 2, firstLinesPerColumn: 5, continuingLinesPerColumn: 5 };
+  const lines = ['A', 'B', '', 'CORO', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+  const pages = paginateChartLines(lines, metrics);
+
+  assert.equal(pages.length, 2);
+  assert.deepEqual(pages[0].columns.map((column) => column.length), [5, 5]);
+  assert.deepEqual(pages[1].columns.flat(), ['I', 'J']);
+});
+
+test('does not move a final section to a new page when the complete song still fits', () => {
+  const metrics = { columns: 2, firstLinesPerColumn: 5, continuingLinesPerColumn: 5 };
+  const lines = ['A', 'B', '', 'CORO', 'C', 'D', 'E', 'F', 'FINAL'];
+  const pages = paginateChartLines(lines, metrics);
+
+  assert.equal(pages.length, 1);
+  assert.deepEqual(pages[0].columns.map((column) => column.length), [5, 4]);
+  assert.equal(pages[0].columns[1].at(-1), 'FINAL');
+});
+
 test('normalizes column and font controls to supported values', () => {
   assert.deepEqual(normalizePrintOptions({ columns: 3, fontSize: 12 }), { columns: 3, fontSize: 12 });
   assert.deepEqual(normalizePrintOptions({ columns: 8, fontSize: 30 }), { columns: 2, fontSize: 9 });
@@ -119,6 +139,20 @@ test('larger fonts reduce line capacity without changing the configured columns'
   assert.equal(large.columns, 3);
   assert.ok(small.firstLinesPerColumn > large.firstLinesPerColumn);
   assert.ok(small.maxCharacters > large.maxCharacters);
+});
+
+test('uses a compact header and nearly all printable vertical space', () => {
+  const metrics = calculatePrintMetrics(
+    { columns: 2, fontSize: 10 },
+    'Alaba',
+    'Entrada suave'
+  );
+  const lastFirstPageBaseline = metrics.firstStart
+    + ((metrics.firstLinesPerColumn - 1) * metrics.lineHeight);
+
+  assert.ok(metrics.firstStart <= 28);
+  assert.ok(metrics.continuingStart <= 18);
+  assert.ok(metrics.footerTop - lastFirstPageBaseline <= metrics.lineHeight + 2);
 });
 
 test('every wrapped line fits inside the physical PDF column width', () => {

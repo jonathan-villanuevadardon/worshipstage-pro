@@ -8,15 +8,14 @@ import { Calendar as CalendarIcon, Users, Music, ArrowRight, Activity, Clock, Di
 import { Link } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { generateServicePdf } from '@/lib/servicePrint.js';
-import { toast } from 'sonner';
+import ServicePrintModal from '@/components/ServicePrintModal.jsx';
 
 export default function RoleBasedDashboard() {
   const { currentUser, activeOrganizationId, activeOrganization } = useAuth();
   const [upcomingServices, setUpcomingServices] = useState([]);
   const [stats, setStats] = useState({ services: 0, songs: 0, team: 0 });
   const [loading, setLoading] = useState(true);
-  const [printingServiceId, setPrintingServiceId] = useState(null);
+  const [printService, setPrintService] = useState(null);
 
   const isFullAccess = ['super_admin', 'church_admin', 'pastor', 'worship_leader'].includes(currentUser?.role);
 
@@ -75,20 +74,6 @@ export default function RoleBasedDashboard() {
     if (hour < 12) return 'Good morning';
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
-  };
-
-  const handlePrint = async (service) => {
-    try {
-      setPrintingServiceId(service.id);
-      toast.info('Generating PDF...');
-      await generateServicePdf(service);
-      toast.success('PDF generated successfully');
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to generate PDF');
-    } finally {
-      setPrintingServiceId(null);
-    }
   };
 
   if (loading) return <LoadingSpinner text="Loading dashboard..." className="mt-20" />;
@@ -196,11 +181,10 @@ export default function RoleBasedDashboard() {
                           variant="secondary"
                           size="sm"
                           className="gap-2"
-                          disabled={printingServiceId === service.id}
-                          onClick={() => handlePrint(service)}
+                          onClick={() => setPrintService(service)}
                         >
                           <Printer className="h-4 w-4" />
-                          {printingServiceId === service.id ? 'Generating...' : 'Print Sheet'}
+                          Print Sheet
                         </Button>
                       </div>
                     </CardContent>
@@ -244,6 +228,12 @@ export default function RoleBasedDashboard() {
           </div>
         </div>
       </div>
+
+      <ServicePrintModal
+        open={Boolean(printService)}
+        onClose={() => setPrintService(null)}
+        service={printService}
+      />
     </>
   );
 }
