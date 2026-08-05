@@ -1,115 +1,129 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileText, Printer } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Columns3, FileText, Printer, Type } from 'lucide-react';
 import { toast } from 'sonner';
-import { jsPDF } from 'jspdf';
+import { exportToPDF, printRepertoire } from '@/lib/repertoireUtils';
+import {
+  DEFAULT_PRINT_OPTIONS,
+  PRINT_COLUMN_OPTIONS,
+  PRINT_FONT_SIZE_OPTIONS,
+} from '@/lib/repertoirePrintLayout.js';
+import RepertoirePrintPreview from '@/components/RepertoirePrintPreview.jsx';
 
 export default function RepertoireExportModal({ open, onClose, repertoire, songs }) {
   const [exporting, setExporting] = useState(false);
+  const [printOptions, setPrintOptions] = useState(DEFAULT_PRINT_OPTIONS);
 
   const generatePDF = () => {
     try {
       setExporting(true);
-      const doc = new jsPDF();
-      let y = 20;
-
-      // Title
-      doc.setFontSize(22);
-      doc.text(repertoire?.name || 'Repertoire', 105, y, { align: 'center' });
-      y += 10;
-      
-      // Metadata
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      const dateStr = repertoire?.created ? new Date(repertoire.created).toLocaleDateString() : '';
-      doc.text(`${repertoire?.service_type || 'Service'} • ${dateStr}`, 105, y, { align: 'center' });
-      y += 15;
-      
-      doc.setTextColor(0);
-
-      if (!songs || songs.length === 0) {
-        doc.text('No songs in this repertoire.', 20, y);
-      } else {
-        songs.forEach((rs, index) => {
-          if (y > 270) {
-            doc.addPage();
-            y = 20;
-          }
-          const song = rs.expand?.song_id || {};
-          
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${index + 1}. ${song.title || 'Unknown Song'}`, 20, y);
-          y += 6;
-
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-          doc.text(`Key: ${rs.key_adjustment || song.key || 'N/A'}  |  Artist: ${song.artist || 'Unknown'}`, 20, y);
-          y += 8;
-
-          if (song.lyrics) {
-            doc.setFontSize(9);
-            const lines = doc.splitTextToSize(song.lyrics.substring(0, 500) + (song.lyrics.length > 500 ? '...' : ''), 170);
-            doc.text(lines, 20, y);
-            y += (lines.length * 4) + 10;
-          } else {
-            y += 10;
-          }
-        });
-      }
-
-      doc.save(`${repertoire?.name || 'Repertoire'}.pdf`);
-      toast.success('PDF exported successfully');
+      exportToPDF(repertoire, songs || [], printOptions);
+      toast.success('PDF exportado respetando espacios, columnas y partes');
       onClose();
     } catch (error) {
       console.error('PDF export failed:', error);
-      toast.error('Failed to generate PDF');
+      toast.error('No fue posible generar el PDF');
     } finally {
       setExporting(false);
     }
   };
 
   const handlePrint = () => {
-    generatePDF(); // Using PDF generation as print basis for now
-    // In a real scenario we'd use window.print() on a specialized hidden print view
+    try {
+      printRepertoire(repertoire, songs || [], printOptions);
+      onClose();
+    } catch (error) {
+      if (error.message === 'PRINT_POPUP_BLOCKED') {
+        toast.error('Permite las ventanas emergentes para imprimir.');
+      } else {
+        toast.error('No fue posible preparar la impresión.');
+      }
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-6xl max-h-[94vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Exportar Repertorio</DialogTitle>
+          <DialogTitle>Configurar PDF e impresión</DialogTitle>
           <DialogDescription>
-            Choose how you want to export "{repertoire?.name}".
+            Cada canción comienza en una hoja nueva. Si ocupa varias hojas, se identifica como Parte 1, Parte 2 y así sucesivamente.
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
-          <Button 
-            variant="outline" 
-            className="h-24 flex flex-col items-center justify-center gap-2" 
-            onClick={generatePDF}
-            disabled={exporting}
-          >
-            <FileText className="w-8 h-8 text-primary" />
-            <span>Exportar como PDF</span>
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            className="h-24 flex flex-col items-center justify-center gap-2" 
-            onClick={handlePrint}
-            disabled={exporting}
-          >
-            <Printer className="w-8 h-8 text-foreground" />
-            <span>Imprimir</span>
-          </Button>
-        </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={exporting}>Cancel</Button>
-        </DialogFooter>
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-6 py-3">
+          <div className="space-y-5">
+            <div className="space-y-2">
+            <Label htmlFor="print-columns" className="flex items-center gap-2">
+              <Columns3 className="w-4 h-4" /> Columnas
+            </Label>
+            <Select
+              value={String(printOptions.columns)}
+              onValueChange={(value) => setPrintOptions((current) => ({ ...current, columns: Number(value) }))}
+            >
+              <SelectTrigger id="print-columns"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PRINT_COLUMN_OPTIONS.map((columns) => (
+                  <SelectItem key={columns} value={String(columns)}>
+                    {columns} {columns === 1 ? 'columna' : 'columnas'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Más columnas ahorran papel en letras cortas.</p>
+            </div>
+
+            <div className="space-y-2">
+            <Label htmlFor="print-font-size" className="flex items-center gap-2">
+              <Type className="w-4 h-4" /> Tamaño de fuente
+            </Label>
+            <Select
+              value={String(printOptions.fontSize)}
+              onValueChange={(value) => setPrintOptions((current) => ({ ...current, fontSize: Number(value) }))}
+            >
+              <SelectTrigger id="print-font-size"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PRINT_FONT_SIZE_OPTIONS.map((fontSize) => (
+                  <SelectItem key={fontSize} value={String(fontSize)}>{fontSize} pt</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">La fuente monoespaciada conserva la posición de los acordes.</p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Formato seleccionado: <strong className="text-foreground">{printOptions.columns} columna{printOptions.columns === 1 ? '' : 's'}, fuente {printOptions.fontSize} pt</strong>.
+              Los datos completos aparecen sólo en la Parte 1; las continuaciones muestran nombre, parte y pie de página.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 pt-2">
+              <Button variant="outline" className="h-16 gap-2" onClick={generatePDF} disabled={exporting}>
+                <FileText className="w-5 h-5 text-primary" />
+                <span>Descargar PDF</span>
+              </Button>
+              <Button className="h-16 gap-2" onClick={handlePrint} disabled={exporting}>
+                <Printer className="w-5 h-5" />
+                <span>Imprimir</span>
+              </Button>
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={onClose} disabled={exporting}>Cancelar</Button>
+            </DialogFooter>
+          </div>
+
+          <div className="w-full max-w-[520px] mx-auto lg:border-l lg:border-border lg:pl-6">
+            <RepertoirePrintPreview
+              key={`${printOptions.columns}-${printOptions.fontSize}-${songs?.length || 0}`}
+              repertoire={repertoire}
+              songs={songs}
+              options={printOptions}
+            />
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

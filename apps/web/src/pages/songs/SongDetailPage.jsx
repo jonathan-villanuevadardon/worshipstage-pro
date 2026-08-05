@@ -37,6 +37,7 @@ export default function SongDetailPage() {
 
   if (loading) return <LoadingSpinner text="Loading song..." className="mt-20" />;
   if (!song) return null;
+  const transposableText = song.chords?.trim() ? song.chords : (song.lyrics || '');
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-8">
@@ -74,7 +75,7 @@ export default function SongDetailPage() {
             <TabsContent value="chords" className="mt-6">
               <Card className="bg-card border-border">
                 <CardContent className="p-6">
-                  <ChordDisplay content={song.chords || song.lyrics} />
+                  <ChordDisplay content={transposableText} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -142,7 +143,7 @@ export default function SongDetailPage() {
           </DialogHeader>
           <div className="flex-1 mt-4">
             <SongTransposeViewer 
-              songText={song.chords || song.lyrics || ''}
+              songText={transposableText}
               originalKey={song.key || ''}
               initialTranspose={0}
             />

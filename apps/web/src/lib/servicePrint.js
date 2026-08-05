@@ -1,16 +1,7 @@
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import pb from '@/lib/supabaseClient';
-import { transposeSong } from '@/lib/musicTransposition.js';
-
-function noteIndex(key) {
-  const sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const flats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-  const sharpIndex = sharps.indexOf(key);
-  if (sharpIndex !== -1) return sharpIndex;
-  const flatIndex = flats.indexOf(key);
-  return flatIndex !== -1 ? flatIndex : 0;
-}
+import { getRepertoireSongView } from '@/lib/repertoireSongUtils.js';
 
 export async function generateServicePdf(service) {
   const doc = new jsPDF();
@@ -69,7 +60,7 @@ export async function generateServicePdf(service) {
     if (repertoireSongs.length > 0) {
       for (let index = 0; index < repertoireSongs.length; index += 1) {
         const repertoireSong = repertoireSongs[index];
-        const song = repertoireSong.expand?.song_id;
+        const { song, originalKey, displayKey, content: displayChords } = getRepertoireSongView(repertoireSong);
         if (!song) continue;
         if (y > 260) {
           doc.addPage();
@@ -83,24 +74,18 @@ export async function generateServicePdf(service) {
 
         doc.setFontSize(10);
         doc.setTextColor(100, 116, 139);
-        const keyText = repertoireSong.key_adjustment && repertoireSong.key_adjustment !== song.key
-          ? `Orig: ${song.key || 'N/A'} -> Transposed: ${repertoireSong.key_adjustment}`
-          : `Key: ${song.key || 'N/A'}`;
+        const keyText = displayKey && displayKey !== originalKey
+          ? `Orig: ${originalKey || 'N/A'} -> Transposed: ${displayKey}`
+          : `Key: ${displayKey || originalKey || 'N/A'}`;
         doc.text(keyText, 25, y);
         y += 8;
-
-        let displayChords = song.chords || song.lyrics || '';
-        if (displayChords && repertoireSong.key_adjustment && song.key) {
-          let difference = noteIndex(repertoireSong.key_adjustment) - noteIndex(song.key);
-          if (difference > 6) difference -= 12;
-          if (difference < -6) difference += 12;
-          displayChords = transposeSong(displayChords, difference, 'sharps');
-        }
 
         doc.setFont('courier', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        const lines = doc.splitTextToSize(displayChords, 170).slice(0, 30);
+        const lines = displayChords
+          ? displayChords.split(/\r\n|\r|\n/).flatMap((line) => doc.splitTextToSize(line || ' ', 170))
+          : ['No chord chart saved for this song.'];
         lines.forEach((line) => {
           if (y > 275) {
             doc.addPage();

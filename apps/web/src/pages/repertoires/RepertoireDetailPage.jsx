@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import pb from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Edit, Trash2, Globe, FileText, Share2, Music, ArrowRightLeft } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Globe, FileText, Share2, Music, ArrowRightLeft, Eye } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import StatusBadge from '@/components/StatusBadge';
 import DurationDisplay from '@/components/DurationDisplay';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import RepertoireExportModal from '@/components/RepertoireExportModal.jsx';
 import SongTransposeViewer from '@/components/SongTransposeViewer.jsx';
+import { getRepertoireSongView } from '@/lib/repertoireSongUtils.js';
 
 export default function RepertoireDetailPage() {
   const { id } = useParams();
@@ -30,42 +31,14 @@ export default function RepertoireDetailPage() {
   const [transposeSongId, setTransposeSongId] = useState(null);
   const [transposeData, setTransposeData] = useState(null); // { text, key, initialTranspose, repSongId, title }
   const [tempTransposeValue, setTempTransposeValue] = useState(0);
+  const [tempDestinationKey, setTempDestinationKey] = useState('');
+  const [savingTranspose, setSavingTranspose] = useState(false);
 
   const canManage = ['super_admin', 'pastor', 'worship_leader', 'church_admin'].includes(currentUser?.role);
 
   useEffect(() => {
     fetchData();
   }, [id]);
-
-  // Debounced auto-save for transposition
-  useEffect(() => {
-    if (!transposeSongId || !canManage) return;
-    if (tempTransposeValue === transposeData.initialTranspose) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-        let idx = SHARPS.indexOf(transposeData.key);
-        if (idx === -1) idx = FLATS.indexOf(transposeData.key);
-        if (idx === -1) idx = 0;
-        
-        const newIdx = (((idx + tempTransposeValue) % 12) + 12) % 12;
-        const newKey = SHARPS[newIdx];
-
-        await pb.collection('repertoire_songs').update(transposeSongId, {
-          key_adjustment: newKey
-        }, { $autoCancel: false });
-
-        setTransposeData(prev => ({ ...prev, initialTranspose: tempTransposeValue }));
-        fetchData(false); // background refresh
-      } catch (err) {
-        toast.error('Failed to auto-save key adjustment');
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [tempTransposeValue, transposeSongId, transposeData, canManage]);
 
   const fetchData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -119,34 +92,45 @@ export default function RepertoireDetailPage() {
   };
 
   const openTranspose = (repSong) => {
-    const song = repSong.expand?.song_id;
+    const { song, originalKey, displayKey, semitones, originalContent } = getRepertoireSongView(repSong);
     if (!song) return;
-    
-    const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const getIdx = (k) => {
-      let i = SHARPS.indexOf(k);
-      if (i === -1) i = FLATS.indexOf(k);
-      return i !== -1 ? i : 0;
-    };
-
-    let initialVal = 0;
-    if (repSong.key_adjustment && song.key) {
-      let diff = getIdx(repSong.key_adjustment) - getIdx(song.key);
-      if (diff > 6) diff -= 12;
-      if (diff < -6) diff += 12;
-      initialVal = diff;
-    }
 
     setTransposeData({
-      text: song.chords || song.lyrics || '',
-      key: song.key || 'C',
+      text: originalContent,
+      key: originalKey || 'C',
       repSongId: repSong.id,
       title: song.title,
-      initialTranspose: initialVal
+      initialTranspose: semitones,
     });
-    setTempTransposeValue(initialVal);
+    setTempTransposeValue(semitones);
+    setTempDestinationKey(displayKey || originalKey || 'C');
     setTransposeSongId(repSong.id);
+  };
+
+  const handleTransposePreviewChange = useCallback((value, details) => {
+    setTempTransposeValue(value);
+    if (details?.realKey) setTempDestinationKey(details.realKey);
+  }, []);
+
+  const saveRepertoireTransposition = async () => {
+    if (!transposeSongId || !transposeData || !canManage) return;
+    setSavingTranspose(true);
+    try {
+      const savedKey = tempTransposeValue === 0 ? '' : tempDestinationKey;
+      await pb.collection('repertoire_songs').update(transposeSongId, {
+        key_adjustment: savedKey,
+      }, { $autoCancel: false });
+      setSongs((currentSongs) => currentSongs.map((item) => (
+        item.id === transposeSongId ? { ...item, key_adjustment: savedKey } : item
+      )));
+      toast.success('Tonalidad guardada sólo para este repertorio');
+      setTransposeSongId(null);
+    } catch (error) {
+      console.error('Failed to save repertoire transposition:', error);
+      toast.error('No fue posible guardar la tonalidad del repertorio');
+    } finally {
+      setSavingTranspose(false);
+    }
   };
 
   const handleModalCloseChange = (open) => {
@@ -183,6 +167,9 @@ export default function RepertoireDetailPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => navigate(`/repertoires/${id}/preview`)} className="gap-2">
+            <Eye className="w-4 h-4" /> Vista e impresión
+          </Button>
           <Button variant="outline" onClick={() => setExportOpen(true)} className="gap-2">
             <FileText className="w-4 h-4" /> Exportar
           </Button>
@@ -338,16 +325,21 @@ export default function RepertoireDetailPage() {
                 songText={transposeData.text}
                 originalKey={transposeData.key}
                 initialTranspose={transposeData.initialTranspose}
-                onTransposeChange={setTempTransposeValue}
+                onTransposeChange={handleTransposePreviewChange}
               />
             )}
           </div>
-          {canManage && (
-            <DialogFooter className="mt-4 pt-4 border-t border-border flex justify-between items-center text-sm text-muted-foreground">
-              <span>Modifications are auto-saved to this repertoire.</span>
-              <Button onClick={() => setTransposeSongId(null)}>Done</Button>
-            </DialogFooter>
-          )}
+          <DialogFooter className="mt-4 pt-4 border-t border-border flex justify-between items-center text-sm text-muted-foreground sm:justify-between">
+            <span>{canManage ? 'El cambio se guardará únicamente en este repertorio.' : 'Vista de la tonalidad guardada en el repertorio.'}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setTransposeSongId(null)} disabled={savingTranspose}>Cancelar</Button>
+              {canManage && (
+                <Button onClick={saveRepertoireTransposition} disabled={savingTranspose}>
+                  {savingTranspose ? 'Guardando…' : 'Guardar tonalidad'}
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

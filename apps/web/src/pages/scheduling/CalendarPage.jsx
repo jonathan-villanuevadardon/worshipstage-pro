@@ -12,11 +12,12 @@ import ServiceDetailsModal from '@/components/ServiceDetailsModal';
 import ServiceFormModal from '@/components/ServiceFormModal';
 import { toast } from 'sonner';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { serviceDateKey, sortServicesChronologically } from '@/lib/serviceCalendarUtils.js';
 
 export default function CalendarPage() {
   const { currentUser, activeOrganizationId } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState('week');
+  const [view, setView] = useState('list');
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -80,10 +81,7 @@ export default function CalendarPage() {
 
   const getServicesForDate = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return services.filter(service => {
-      const serviceDateStr = new Date(service.date).toISOString().split('T')[0];
-      return serviceDateStr === dateStr;
-    });
+    return services.filter((service) => serviceDateKey(service.date) === dateStr);
   };
 
   const renderMonthView = () => {
@@ -131,22 +129,23 @@ export default function CalendarPage() {
     );
   };
 
-  const renderWeekView = () => {
-    const weekStart = startOfWeek(currentDate);
-    const weekEnd = endOfWeek(currentDate);
-    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const renderListView = () => {
+    const groupedServices = sortServicesChronologically(services).reduce((groups, service) => {
+      const dateKey = serviceDateKey(service.date) || 'Sin fecha';
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(service);
+      return groups;
+    }, {});
 
     return (
       <div className="flex flex-col gap-6">
-        {days.map(day => {
-          const dayServices = getServicesForDate(day);
-          if (dayServices.length === 0) return null;
-
+        {Object.entries(groupedServices).map(([dateKey, dayServices]) => {
+          const day = dateKey === 'Sin fecha' ? null : new Date(`${dateKey}T12:00:00`);
           return (
-            <div key={day.toISOString()} className="flex flex-col md:flex-row gap-6 items-start">
+            <div key={dateKey} className="flex flex-col md:flex-row gap-6 items-start">
               <div className="w-24 shrink-0 pt-2 text-center md:text-left">
-                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{format(day, 'EEE')}</div>
-                <div className="text-3xl font-bold">{format(day, 'dd')}</div>
+                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{day ? format(day, 'MMM yyyy') : 'Fecha'}</div>
+                <div className="text-3xl font-bold">{day ? format(day, 'dd') : '—'}</div>
               </div>
               
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
@@ -194,9 +193,9 @@ export default function CalendarPage() {
             </div>
           );
         })}
-        {days.every(d => getServicesForDate(d).length === 0) && (
+        {services.length === 0 && (
           <div className="text-center py-20 bg-muted/30 rounded-xl border border-dashed border-border text-muted-foreground">
-            No services scheduled for this week.
+            No hay servicios registrados todavía.
           </div>
         )}
       </div>
@@ -218,12 +217,12 @@ export default function CalendarPage() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
               <Button 
-                variant={view === 'week' ? 'secondary' : 'ghost'} 
+                variant={view === 'list' ? 'secondary' : 'ghost'}
                 size="sm" 
-                onClick={() => setView('week')}
-                className="px-4"
+                onClick={() => setView('list')}
+                className="px-4 gap-2"
               >
-                List View
+                <List className="w-4 h-4" /> List View
               </Button>
               <Button 
                 variant={view === 'month' ? 'secondary' : 'ghost'} 
@@ -245,20 +244,20 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handlePreviousPeriod}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" onClick={() => setCurrentDate(new Date())}>
-              Today
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleNextPeriod}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+        <div className="flex items-center justify-between mb-8 gap-4">
+          {view === 'month' ? (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={handlePreviousPeriod}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
+              <Button variant="outline" size="icon" onClick={handleNextPeriod}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : <div />}
           <h2 className="text-xl font-semibold">
-            {view === 'month' ? format(currentDate, 'MMMM yyyy') : `Week of ${format(startOfWeek(currentDate), 'MMM d, yyyy')}`}
+            {view === 'month' ? format(currentDate, 'MMMM yyyy') : `${services.length} servicio${services.length === 1 ? '' : 's'}`}
           </h2>
         </div>
 
@@ -273,7 +272,7 @@ export default function CalendarPage() {
           </div>
         ) : (
           <div>
-            {view === 'month' ? renderMonthView() : renderWeekView()}
+            {view === 'month' ? renderMonthView() : renderListView()}
           </div>
         )}
 

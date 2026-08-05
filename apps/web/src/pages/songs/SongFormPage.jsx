@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { detectKey, parseChords } from '@/lib/musicTransposition';
+import { getChordKey, parseChords } from '@/lib/musicTransposition';
 
 export default function SongFormPage() {
   const { id } = useParams();
@@ -41,11 +41,13 @@ export default function SongFormPage() {
   });
 
   const chordAnalysis = useMemo(() => {
-    const source = formData.chords || formData.lyrics;
+    const source = [formData.lyrics, formData.chords]
+      .filter((value) => value.trim())
+      .join('\n');
     const detectedChords = parseChords(source);
     return {
       count: detectedChords.length,
-      key: detectedChords.length > 0 ? detectKey(source) : '',
+      key: detectedChords.length > 0 ? getChordKey(detectedChords[0].chord) : '',
     };
   }, [formData.chords, formData.lyrics]);
 
@@ -219,7 +221,7 @@ export default function SongFormPage() {
                 value={formData.lyrics} 
                 onChange={handleChange} 
                 className="min-h-[200px] bg-background font-sans" 
-                placeholder="Enter lyrics here..."
+                placeholder={'Escribe la letra con acordes, por ejemplo:\n[C]Cristo me ama\n[G]Él me salvó\n[Am]Su gracia me alcanzó'}
               />
             </div>
             <div className="space-y-2">

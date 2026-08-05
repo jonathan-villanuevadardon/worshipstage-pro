@@ -8,6 +8,7 @@
     "build:hostinger": "npm run build",
     "start": "npm run start --prefix apps/api",
     "lint": "concurrently --raw \"npm run lint --prefix apps/web\" \"npm run lint --prefix apps/api\"",
+    "test": "npm run test --prefix apps/web",
     "check": "npm run lint && npm run build"
   },
   "devDependencies": {

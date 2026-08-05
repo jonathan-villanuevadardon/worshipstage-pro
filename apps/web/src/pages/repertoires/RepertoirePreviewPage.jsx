@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, FileText, Share2 } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DurationDisplay from '@/components/DurationDisplay';
-import { exportToText, exportToPDF } from '@/lib/repertoireUtils';
+import { exportToText } from '@/lib/repertoireUtils';
+import { getRepertoireSongView } from '@/lib/repertoireSongUtils';
 import { toast } from 'sonner';
+import RepertoireExportModal from '@/components/RepertoireExportModal.jsx';
 
 export default function RepertoirePreviewPage() {
   const { id } = useParams();
@@ -14,6 +16,7 @@ export default function RepertoirePreviewPage() {
   const [repertoire, setRepertoire] = useState(null);
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,10 +43,6 @@ export default function RepertoirePreviewPage() {
     fetchData();
   }, [id, navigate]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast.success('Link copied to clipboard');
@@ -67,10 +66,10 @@ export default function RepertoirePreviewPage() {
             <Button variant="outline" onClick={() => exportToText(repertoire, songs)} className="gap-2">
               <FileText className="w-4 h-4" /> Text
             </Button>
-            <Button variant="outline" onClick={() => exportToPDF(repertoire, songs)} className="gap-2">
+            <Button variant="outline" onClick={() => setExportOpen(true)} className="gap-2">
               <FileText className="w-4 h-4" /> PDF
             </Button>
-            <Button onClick={handlePrint} className="gap-2">
+            <Button onClick={() => setExportOpen(true)} className="gap-2">
               <Printer className="w-4 h-4" /> Print
             </Button>
           </div>
@@ -95,9 +94,9 @@ export default function RepertoirePreviewPage() {
 
         <div className="space-y-6">
           {songs.map((rs, index) => {
-            const song = rs.expand?.song_id || {};
+            const { song, originalKey, displayKey, content } = getRepertoireSongView(rs);
             return (
-              <div key={rs.id} className="flex gap-6 p-4 rounded-xl border border-border print:border-black/20 print:break-inside-avoid bg-card print:bg-transparent">
+              <div key={rs.id} className="flex gap-6 p-4 rounded-xl border border-border print:border-black/20 bg-card print:bg-transparent">
                 <div className="text-2xl font-bold text-muted-foreground print:text-black/40 w-8 text-right shrink-0">
                   {index + 1}
                 </div>
@@ -109,10 +108,12 @@ export default function RepertoirePreviewPage() {
                   <p className="text-muted-foreground print:text-black/70 mb-3">{song.artist || 'Unknown Artist'}</p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    {(song.key || rs.key_adjustment) && (
+                    {displayKey && (
                       <div>
                         <span className="text-muted-foreground print:text-black/60 block text-xs uppercase tracking-wider mb-1">Key</span>
-                        <span className="font-mono font-medium print:text-black">{rs.key_adjustment || song.key}</span>
+                        <span className="font-mono font-medium print:text-black">
+                          {displayKey}{displayKey !== originalKey ? ` (original: ${originalKey || 'N/A'})` : ''}
+                        </span>
                       </div>
                     )}
                     {rs.notes && (
@@ -122,6 +123,15 @@ export default function RepertoirePreviewPage() {
                       </div>
                     )}
                   </div>
+                  {content ? (
+                    <pre className="mt-5 border-t border-border print:border-black/20 pt-4 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground print:text-black">
+                      {content}
+                    </pre>
+                  ) : (
+                    <p className="mt-5 border-t border-border print:border-black/20 pt-4 text-sm italic text-muted-foreground print:text-black/60">
+                      No hay letras o acordes guardados para esta canción.
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -134,6 +144,12 @@ export default function RepertoirePreviewPage() {
           </div>
         )}
       </div>
+      <RepertoireExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        repertoire={repertoire}
+        songs={songs}
+      />
     </div>
   );
 }

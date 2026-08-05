@@ -1,68 +1,91 @@
 import { useState, useCallback, useMemo } from 'react';
-import { transposeSong, calculateCapo, detectKey } from '@/lib/musicTransposition';
+import {
+  clampSemitones,
+  detectKey,
+  findSimplestCapo,
+  getSemitoneDifference,
+  getVisualTransposition,
+  keyToIndex,
+  normalizeCapo,
+  transposeKey,
+  transposeSong,
+} from '@/lib/musicTransposition';
 
 export function useSongTransposition(initialSongText = '', initialKey = '') {
-  const defaultKey = useMemo(() => initialKey || detectKey(initialSongText), [initialKey, initialSongText]);
+  const originalKey = useMemo(
+    () => (keyToIndex(initialKey) !== -1 ? initialKey : detectKey(initialSongText)),
+    [initialKey, initialSongText]
+  );
 
   const [transposeValue, setTransposeValue] = useState(0);
-  const [notationMode, setNotationMode] = useState('sharps');
-  const [destinationKey, setDestinationKey] = useState(defaultKey);
+  const [notationMode, setNotationMode] = useState(() => (originalKey.includes('b') ? 'flats' : 'sharps'));
+  const [capo, setCapo] = useState(0);
 
-  const capo = useMemo(() => calculateCapo(defaultKey, transposeValue), [defaultKey, transposeValue]);
+  const realKey = useMemo(
+    () => transposeKey(originalKey, transposeValue, notationMode),
+    [originalKey, transposeValue, notationMode]
+  );
+  const visualTransposeValue = useMemo(
+    () => getVisualTransposition(transposeValue, capo),
+    [transposeValue, capo]
+  );
+  const visualKey = useMemo(
+    () => transposeKey(originalKey, visualTransposeValue, notationMode),
+    [originalKey, visualTransposeValue, notationMode]
+  );
+  const recommendedCapo = useMemo(
+    () => findSimplestCapo(initialSongText, transposeValue, notationMode),
+    [initialSongText, transposeValue, notationMode]
+  );
 
   const updateTransposeValue = useCallback((value) => {
-    setTransposeValue(value);
-    // Note: destinationKey logic would typically be updated here to match the new interval, 
-    // but for simplicity, we focus on the raw semitone value.
+    setTransposeValue(clampSemitones(value));
   }, []);
 
   const updateCapo = useCallback((value) => {
-    // If user sets capo manually, we adjust transposeValue inversely
-    setTransposeValue(-value);
+    setCapo(normalizeCapo(value));
   }, []);
 
   const updateNotationMode = useCallback((mode) => {
-    setNotationMode(mode);
+    if (mode === 'sharps' || mode === 'flats') setNotationMode(mode);
   }, []);
 
-  const updateDestinationKey = useCallback((newKey, originalKey) => {
-    const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-    
-    let origIndex = SHARPS.indexOf(originalKey);
-    if (origIndex === -1) origIndex = FLATS.indexOf(originalKey);
-    
-    let destIndex = SHARPS.indexOf(newKey);
-    if (destIndex === -1) destIndex = FLATS.indexOf(newKey);
-    
-    if (origIndex !== -1 && destIndex !== -1) {
-      let diff = destIndex - origIndex;
-      if (diff > 6) diff -= 12;
-      if (diff < -5) diff += 12;
-      setTransposeValue(diff);
-      setDestinationKey(newKey);
-    }
-  }, []);
+  const updateDestinationKey = useCallback((newKey) => {
+    setTransposeValue(getSemitoneDifference(originalKey, newKey));
+    if (newKey.includes('b')) setNotationMode('flats');
+    if (newKey.includes('#')) setNotationMode('sharps');
+  }, [originalKey]);
+
+  const simplifyChords = useCallback(() => {
+    setCapo(recommendedCapo);
+  }, [recommendedCapo]);
 
   const resetTransposition = useCallback(() => {
     setTransposeValue(0);
-    setDestinationKey(defaultKey);
-  }, [defaultKey]);
+    setCapo(0);
+  }, []);
 
   const getTransposedSong = useCallback((songText) => {
-    return transposeSong(songText, transposeValue, notationMode);
-  }, [transposeValue, notationMode]);
+    return transposeSong(songText, visualTransposeValue, notationMode);
+  }, [visualTransposeValue, notationMode]);
 
   return {
+    originalKey,
     transposeValue,
+    visualTransposeValue,
     capo,
     notationMode,
-    destinationKey,
+    destinationKey: realKey,
+    realKey,
+    visualKey,
+    recommendedCapo,
+    chordsAreSimplified: capo === recommendedCapo,
     updateTransposeValue,
     updateCapo,
     updateNotationMode,
     updateDestinationKey,
+    simplifyChords,
     resetTransposition,
-    getTransposedSong
+    getTransposedSong,
   };
 }
